@@ -1,1 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Product Recommendation System</title>
+  <!-- Load React and Axios via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/axios@1.4.0/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    /* Basic CSS for styling */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      color: #333;
+      text-align: center;
+    }
+    form {
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    label {
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    input {
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+    button:hover:not(:disabled) {
+      background-color: #0056b3;
+    }
+    ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    li {
+      background: #f9f9f9;
+      margin: 10px 0;
+      padding: 10px;
+      border-radius: 4px;
+      border-left: 4px solid #007bff;
+    }
+    p {
+      text-align: center;
+      color: #666;
+    }
+    .error {
+      color: red;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // All React components and logic inlined here
+
+    // ProductList Component: Displays recommended products
+    function ProductList({ products }) {
+      return (
+        <div>
+          <h2>Recommended Products</h2>
+          {products.length === 0 ? (
+            <p>No recommendations yet. Enter your preferences above!</p>
+          ) : (
+            <ul>
+              {products.map((product) => (
+                <li key={product.id}>
+                  <strong>{product.name}</strong> - ${product.price} ({product.category})<br />
+                  {product.description}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      );
+    }
+
+    // RecommendationForm Component: Handles user input and AI API calls (mocked for demo)
+    function RecommendationForm({ products, setRecommendedProducts }) {
+      const [userInput, React.useState] = React.useState('');
+      const [loading, React.useState] = React.useState(false);
+      const [error, React.useState] = React.useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        React.useState[1](true); // setLoading(true)
+        React.useState[3](''); // setError('')
+        setRecommendedProducts([]);
+
+        try {
+          // Mocked AI response for demo (no real API key needed)
+          // In production, replace this with the actual axios.post call to OpenAI
+          // Simulates recommending products 1 and 3 (phones under $500) for phone queries
+          let mockResponse = [];
+          if (userInput.toLowerCase().includes('phone')) {
+            mockResponse = [1, 3]; // iPhone 12 and Google Pixel 5
+          } else if (userInput.toLowerCase().includes('laptop')) {
+            mockResponse = [4, 6]; // MacBook Air and HP Pavilion
+          } else {
+            mockResponse = [1, 4]; // Default fallback
+          }
+
+          // Simulate a delay for realism
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Filter products based on mock response
+          const filteredProducts = products.filter(p => mockResponse.includes(p.id));
+          setRecommendedProducts(filteredProducts);
+        } catch (err) {
+          React.useState[3]('Error fetching recommendations. Try again.');
+          console.error(err);
+        } finally {
+          React.useState[1](false); // setLoading(false)
+        }
+      };
+
+      return (
+        <form onSubmit={handleSubmit}>
+          <label>
+            Enter your preferences (e.g., "I want a phone under $500"):
+            <input
+              type="text"
+              value={userInput}
+              onChange={(e) => React.useState[0](e.target.value)} // setUserInput
+              required
+            />
+          </label>
+          <button type="submit" disabled={loading}>
+            {loading ? 'Getting Recommendations...' : 'Get Recommendations'}
+          </button>
+          {error && <p className="error">{error}</p>}
+        </form>
+      );
+    }
+
+    // Main App Component
+    function App() {
+      const [products] = React.useState([
+        { id: 1, name: 'iPhone 12', category: 'phone', price: 400, description: 'A reliable smartphone.' },
+        { id: 2, name: 'Samsung Galaxy S21', category: 'phone', price: 450, description: 'High-end Android phone.' },
+        { id: 3, name: 'Google Pixel 5', category: 'phone', price: 350, description: 'Great camera phone.' },
+        { id: 4, name: 'MacBook Air', category: 'laptop', price: 1000, description: 'Lightweight laptop.' },
+        { id: 5, name: 'Dell XPS 13', category: 'laptop', price: 900, description: 'Powerful ultrabook.' },
+        { id: 6, name: 'HP Pavilion', category: 'laptop', price: 600, description: 'Affordable laptop.' },
+      ]);
+      const [recommendedProducts, setRecommendedProducts] = React.useState([]);
+
+      return (
+        <div className="app">
+          <h1>AI Product Recommendation System</h1>
+          <RecommendationForm products={products} setRecommendedProducts={setRecommendedProducts} />
+          <ProductList products={recommendedProducts} />
+        </div>
+      );
+    }
+
+    // Render the app
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
 
