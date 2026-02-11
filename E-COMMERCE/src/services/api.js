@@ -23,19 +23,24 @@ export const api = {
     },
 
     // Orders
-    createOrder: async (orderData) => {
+    createOrder: async (orderData, token) => {
         const response = await fetch(`${API_BASE_URL}/orders`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
             },
             body: JSON.stringify(orderData),
         });
         return response.json();
     },
 
-    getAllOrders: async () => {
-        const response = await fetch(`${API_BASE_URL}/orders`);
+    getAllOrders: async (token) => {
+        const response = await fetch(`${API_BASE_URL}/orders`, {
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+            }
+        });
         return response.json();
     },
 
@@ -73,11 +78,12 @@ export const api = {
     },
 
     // Mark order as delivered
-    markOrderDelivered: async (orderId) => {
+    markOrderDelivered: async (orderId, token) => {
         const response = await fetch(`${API_BASE_URL}/orders/${orderId}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
+                'Authorization': token ? `Bearer ${token}` : '',
             },
             body: JSON.stringify({ status: 'Delivered' }),
         });

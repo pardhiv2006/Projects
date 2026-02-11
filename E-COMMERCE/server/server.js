@@ -2,9 +2,15 @@ import express from 'express';
 import cors from 'cors';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import { MongoClient, ObjectId } from 'mongodb';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+import { createUser, findUserByEmail, findUserById, updateUserProfile, validatePassword, UserRole } from './models.js';
+
+dotenv.config();
 
 const app = express();
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev';
 
 // Middleware
 app.use(cors());
@@ -16,9 +22,21 @@ let productsCollection;
 let ordersCollection;
 
 // Initialize in-memory MongoDB
+// Initialize MongoDB
 async function initDB() {
-    const mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
+    let uri = process.env.MONGODB_URI;
+
+    if (!uri || uri.includes('<username>')) {
+        console.log('⚠️ No MONGODB_URI found or it is a placeholder. Using in-memory MongoDB with local persistence...');
+        const mongod = await MongoMemoryServer.create({
+            instance: {
+                dbPath: './db-data', // Local directory for persistence
+                storageEngine: 'wiredTiger'
+            }
+        });
+        uri = mongod.getUri();
+    }
+
     const client = new MongoClient(uri);
 
     await client.connect();
@@ -26,11 +44,49 @@ async function initDB() {
     productsCollection = db.collection('products');
     ordersCollection = db.collection('orders');
 
-    console.log('✅ Connected to in-memory MongoDB');
+    console.log('✅ Connected to MongoDB');
 
     // Seed initial data
     await seedProducts();
+    await seedAdmin();
 }
+
+// Seed admin user
+async function seedAdmin() {
+    const adminEmail = 'admin@firstmart.com';
+    const existingAdmin = await findUserByEmail(db, adminEmail);
+    if (!existingAdmin) {
+        await createUser(db, {
+            name: 'System Admin',
+            email: adminEmail,
+            password: 'admin123',
+            role: UserRole.ADMIN
+        });
+        console.log('✅ Default admin created: admin@firstmart.com / admin123');
+    }
+}
+
+// Auth Middleware
+const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ error: 'Access denied. Token missing.' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ error: 'Invalid token.' });
+        req.user = user;
+        next();
+    });
+};
+
+const isAdmin = (req, res, next) => {
+    if (req.user && req.user.role === UserRole.ADMIN) {
+        next();
+    } else {
+        res.status(403).json({ error: 'Require Admin Role' });
+    }
+};
 
 // Seed products data
 async function seedProducts() {
@@ -41,6 +97,90 @@ async function seedProducts() {
         console.log(`✅ Seeded ${products.length} products`);
     }
 }
+
+// Auth Routes
+
+// Signup
+app.post('/api/auth/signup', async (req, res) => {
+    try {
+        const { name, email, password } = req.body;
+        const user = await createUser(db, { name, email, password });
+
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, profile: user.profile } });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Login
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await findUserByEmail(db, email);
+
+        if (!user || !(await validatePassword(password, user.password))) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+
+        const token = jwt.sign(
+            { id: user._id, email: user.email, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, profile: user.profile } });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// User Profile Routes
+
+// Get profile
+app.get('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const user = await findUserById(db, req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const { password, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update profile
+app.put('/api/profile', authenticateToken, async (req, res) => {
+    try {
+        const profileData = req.body;
+        const updatedUser = await updateUserProfile(db, req.user.id, profileData);
+        if (!updatedUser) return res.status(404).json({ error: 'User not found' });
+
+        const { password, ...userWithoutPassword } = updatedUser;
+        res.json(userWithoutPassword);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin Product Management
+
+// Admin - Get all products (with extra details if needed, for now same as public)
+app.get('/api/admin/products', authenticateToken, isAdmin, async (req, res) => {
+    try {
+        const products = await productsCollection.find({}).toArray();
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 
 // Routes
 
@@ -97,9 +237,10 @@ app.get('/api/products/search/:query', async (req, res) => {
 });
 
 // Create order
-app.post('/api/orders', async (req, res) => {
+app.post('/api/orders', authenticateToken, async (req, res) => {
     try {
         const { items, total, subtotal, discount, discountApplied } = req.body;
+        const userId = req.user.id;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'Order must contain items' });
@@ -115,6 +256,7 @@ app.post('/api/orders', async (req, res) => {
 
         const order = {
             id: orderId,
+            userId: userId,
             items: items,
             total: total,
             subtotal: subtotal || total + discount,
@@ -135,10 +277,18 @@ app.post('/api/orders', async (req, res) => {
     }
 });
 
-// Get all orders
-app.get('/api/orders', async (req, res) => {
+// Get user's orders
+app.get('/api/orders', authenticateToken, async (req, res) => {
     try {
-        const orders = await ordersCollection.find({}).toArray();
+        const userId = req.user.id;
+        let query = { userId: userId };
+
+        // If admin, show all orders (optional, but good for admin dashboard)
+        if (req.user.role === UserRole.ADMIN) {
+            query = {};
+        }
+
+        const orders = await ordersCollection.find(query).toArray();
         res.json(orders);
     } catch (error) {
         res.status(500).json({ error: error.message });

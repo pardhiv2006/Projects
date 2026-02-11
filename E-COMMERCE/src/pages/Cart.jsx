@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Button from '../components/Button';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 import { coupons } from '../data';
 import './Cart.css';
 
 const Cart = () => {
     const { cart, orders, removeFromCart, updateQuantity, checkout } = useShop();
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -19,6 +21,10 @@ const Cart = () => {
     const totalDiscount = totalOriginalPrice - subtotal;
 
     const handleCheckout = () => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
         if (cart.length === 0) return;
         setTimeout(() => {
             checkout(subtotal, totalDiscount);

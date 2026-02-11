@@ -26,8 +26,6 @@ export const ShopProvider = ({ children }) => {
             try {
                 await api.healthCheck();
                 setBackendAvailable(true);
-                // Fetch orders from backend if available
-                await syncOrdersFromBackend();
             } catch (err) {
                 console.warn('Backend not available, using localStorage');
                 setBackendAvailable(false);
@@ -35,6 +33,16 @@ export const ShopProvider = ({ children }) => {
         };
         checkBackend();
     }, []);
+
+    // Sync orders when token changes
+    useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token && backendAvailable) {
+            syncOrdersFromBackend(token);
+        } else if (!token) {
+            setOrders([]); // Clear orders on logout
+        }
+    }, [backendAvailable]);
 
     // Sync local storage
     useEffect(() => {
@@ -46,9 +54,12 @@ export const ShopProvider = ({ children }) => {
     }, [orders]);
 
     // Sync orders from backend
-    const syncOrdersFromBackend = async () => {
+    const syncOrdersFromBackend = async (token) => {
+        if (!token) token = localStorage.getItem('token');
+        if (!token) return;
+
         try {
-            const backendOrders = await api.getAllOrders();
+            const backendOrders = await api.getAllOrders(token);
             if (Array.isArray(backendOrders)) {
                 // Format backend orders to match frontend format
                 const formattedOrders = backendOrders.map(order => ({
@@ -129,7 +140,8 @@ export const ShopProvider = ({ children }) => {
             // Try to save to backend if available
             if (backendAvailable) {
                 try {
-                    const backendResponse = await api.createOrder(orderData);
+                    const token = localStorage.getItem('token');
+                    const backendResponse = await api.createOrder(orderData, token);
                     newOrder = {
                         id: backendResponse.id,
                         date: backendResponse.date,
@@ -184,7 +196,8 @@ export const ShopProvider = ({ children }) => {
             // Try to update on backend if available
             if (backendAvailable) {
                 try {
-                    await api.cancelOrder(orderId);
+                    const token = localStorage.getItem('token');
+                    await api.cancelOrder(orderId, token);
                 } catch (err) {
                     console.warn('Failed to cancel order on backend:', err);
                 }
@@ -213,7 +226,8 @@ export const ShopProvider = ({ children }) => {
             // Try to update on backend if available
             if (backendAvailable) {
                 try {
-                    await api.markOrderDelivered(orderId);
+                    const token = localStorage.getItem('token');
+                    await api.markOrderDelivered(orderId, token);
                 } catch (err) {
                     console.warn('Failed to mark order as delivered on backend:', err);
                 }

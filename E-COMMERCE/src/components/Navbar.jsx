@@ -2,12 +2,14 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Search, User, Menu, ChevronDown } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
 const Navbar = () => {
     const location = useLocation();
     const navigate = useNavigate();
     const { cartCount, searchQuery, setSearchQuery } = useShop();
+    const { user, logout, isAdmin } = useAuth();
 
     const handleSearch = (e) => {
         setSearchQuery(e.target.value);
@@ -40,11 +42,24 @@ const Navbar = () => {
                 </div>
 
                 <div className="navbar-right">
-                    <div className="nav-item user-login">
-                        <User size={18} />
-                        <span>Login</span>
-                        <ChevronDown size={14} />
-                    </div>
+                    {user ? (
+                        <>
+                            <div className="nav-item user-dropdown">
+                                <User size={18} />
+                                <span className="user-name">{user.name.split(' ')[0]}</span>
+                                <ChevronDown size={14} />
+                                <div className="dropdown-menu">
+                                    <Link to="/profile">My Profile</Link>
+                                    {isAdmin && <Link to="/admin">Admin Panel</Link>}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <Link to="/login" className="nav-item user-login">
+                            <User size={18} />
+                            <span>Login</span>
+                        </Link>
+                    )}
 
                     <Link to="/orders" className="nav-item orders-link">
                         <span>My Orders</span>
