@@ -1,0 +1,14 @@
+{
+  "include": [
+    "backend",
+    "ml"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "frontend"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingTypeStubs": "none",
+  "typeCheckingMode": "off"
+}

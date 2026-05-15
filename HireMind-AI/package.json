@@ -1,0 +1,19 @@
+{
+  "name": "hiremind-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "setup": "chmod +x setup.sh && ./setup.sh",
+    "backend": "cd backend && ./venv/bin/python -m uvicorn app.main:app --reload --port 8000",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\" \"sleep 5 && open http://localhost:3000\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
